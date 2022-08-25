@@ -23,6 +23,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	traefikkubemock "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned/fake"
 	netv1 "k8s.io/api/networking/v1"
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,8 +64,9 @@ func Test_watchAll_handlesUnsupportedVersions(t *testing.T) {
 			t.Parallel()
 
 			kubeClient := kubemock.NewSimpleClientset()
+			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			_, err := watchAll(context.Background(), kubeClient, test.serverVersion)
+			_, err := watchAll(context.Background(), kubeClient, traefikClient, test.serverVersion)
 
 			test.wantErr(t, err)
 		})
@@ -88,6 +90,7 @@ func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
 						Name:      "myIngress_netv1beta1",
 						Namespace: "myns",
 					},
+					IngressMeta: IngressMeta{},
 				},
 			},
 		},
@@ -102,6 +105,7 @@ func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
 						Name:      "myIngress_netv1beta1",
 						Namespace: "myns",
 					},
+					IngressMeta: IngressMeta{},
 				},
 			},
 		},
@@ -116,6 +120,7 @@ func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
 						Name:      "myIngress_netv1beta1",
 						Namespace: "myns",
 					},
+					IngressMeta: IngressMeta{},
 				},
 			},
 		},
@@ -130,6 +135,7 @@ func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
 						Name:      "myIngress_netv1",
 						Namespace: "myns",
 					},
+					IngressMeta: IngressMeta{},
 				},
 			},
 		},
@@ -144,6 +150,7 @@ func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
 						Name:      "myIngress_netv1",
 						Namespace: "myns",
 					},
+					IngressMeta: IngressMeta{},
 				},
 			},
 		},
@@ -170,8 +177,9 @@ func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
 			}
 
 			kubeClient := kubemock.NewSimpleClientset(k8sObjects...)
+			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, test.serverVersion)
+			f, err := watchAll(context.Background(), kubeClient, traefikClient, test.serverVersion)
 			require.NoError(t, err)
 
 			got, err := f.getIngresses()
