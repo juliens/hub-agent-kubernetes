@@ -28,10 +28,12 @@ import (
 	netv1beta1 "k8s.io/api/networking/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/version"
+	fakediscovery "k8s.io/client-go/discovery/fake"
 	kubemock "k8s.io/client-go/kubernetes/fake"
 )
 
-func Test_watchAll_handlesUnsupportedVersions(t *testing.T) {
+func TestNewFetcher_handlesUnsupportedVersions(t *testing.T) {
 	tests := []struct {
 		desc          string
 		serverVersion string
@@ -66,14 +68,18 @@ func Test_watchAll_handlesUnsupportedVersions(t *testing.T) {
 			kubeClient := kubemock.NewSimpleClientset()
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			_, err := watchAll(context.Background(), kubeClient, traefikClient, test.serverVersion)
+			fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
+			require.True(t, ok, "couldn't convert Discovery() to *FakeDiscovery")
 
+			fakeDiscovery.FakedServerVersion = &version.Info{GitVersion: test.serverVersion}
+
+			_, err := NewFetcher(context.Background(), kubeClient, traefikClient)
 			test.wantErr(t, err)
 		})
 	}
 }
 
-func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
+func TestNewFetcher_handlesAllIngressAPIVersions(t *testing.T) {
 	tests := []struct {
 		desc          string
 		serverVersion string
@@ -179,7 +185,12 @@ func Test_watchAll_handlesAllIngressAPIVersions(t *testing.T) {
 			kubeClient := kubemock.NewSimpleClientset(k8sObjects...)
 			traefikClient := traefikkubemock.NewSimpleClientset()
 
-			f, err := watchAll(context.Background(), kubeClient, traefikClient, test.serverVersion)
+			fakeDiscovery, ok := kubeClient.Discovery().(*fakediscovery.FakeDiscovery)
+			require.True(t, ok, "couldn't convert Discovery() to *FakeDiscovery")
+
+			fakeDiscovery.FakedServerVersion = &version.Info{GitVersion: test.serverVersion}
+
+			f, err := NewFetcher(context.Background(), kubeClient, traefikClient)
 			require.NoError(t, err)
 
 			got, err := f.getIngresses()

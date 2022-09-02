@@ -28,7 +28,6 @@ import (
 	traefikv1alpha1 "github.com/traefik/hub-agent-kubernetes/pkg/crd/api/traefik/v1alpha1"
 	traefikclientset "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/clientset/versioned"
 	traefikinformer "github.com/traefik/hub-agent-kubernetes/pkg/crd/generated/client/traefik/informers/externalversions"
-	"github.com/traefik/hub-agent-kubernetes/pkg/kube"
 	"github.com/traefik/hub-agent-kubernetes/pkg/kubevers"
 	kerror "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/client-go/discovery"
@@ -46,32 +45,13 @@ type Fetcher struct {
 }
 
 // NewFetcher creates a new Fetcher.
-func NewFetcher(ctx context.Context) (*Fetcher, error) {
-	config, err := kube.InClusterConfigWithRetrier(2)
-	if err != nil {
-		return nil, fmt.Errorf("create Kubernetes in-cluster configuration: %w", err)
-	}
-
-	clientSet, err := clientset.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
-	traefikClientSet, err := traefikclientset.NewForConfig(config)
-	if err != nil {
-		return nil, err
-	}
-
+func NewFetcher(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface) (*Fetcher, error) {
 	serverVersion, err := clientSet.Discovery().ServerVersion()
 	if err != nil {
 		return nil, fmt.Errorf("get server version: %w", err)
 	}
 
-	return watchAll(ctx, clientSet, traefikClientSet, serverVersion.GitVersion)
-}
-
-func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion string) (*Fetcher, error) {
-	serverSemVer, err := version.NewVersion(serverVersion)
+	serverSemVer, err := version.NewVersion(serverVersion.GitVersion)
 	if err != nil {
 		return nil, fmt.Errorf("parse server version: %w", err)
 	}
@@ -80,6 +60,10 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 		return nil, fmt.Errorf("unsupported version: %s", serverSemVer)
 	}
 
+	return watchAll(ctx, clientSet, traefikClientSet, serverVersion.GitVersion)
+}
+
+func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientSet traefikclientset.Interface, serverVersion string) (*Fetcher, error) {
 	kubernetesFactory := informers.NewSharedInformerFactoryWithOptions(clientSet, 5*time.Minute)
 
 	kubernetesFactory.Core().V1().Pods().Informer()
@@ -104,6 +88,7 @@ func watchAll(ctx context.Context, clientSet clientset.Interface, traefikClientS
 	if err != nil {
 		return nil, fmt.Errorf("check presence of Traefik IngressRoute, TraefikService and TLSOption CRD: %w", err)
 	}
+
 	if hasTraefikCRDs {
 		traefikFactory.Traefik().V1alpha1().IngressRoutes().Informer()
 		traefikFactory.Traefik().V1alpha1().TraefikServices().Informer()
